@@ -1,0 +1,9 @@
+jaxlib 
+optax 
+tqdm
+flax
+
+--find-links https://storage.googleapis.com/jax-releases/libtpu_releases.html
+jax[tpu]>=0.2.16
+
+git+https://github.com/deepmind/jmp
