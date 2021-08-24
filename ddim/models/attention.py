@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import flax.linen as nn
 
-from convolutional import ConvND
+from .convolutional import ConvND
 
 class SpatialSelfAttentionBlock(nn.Module):
     """

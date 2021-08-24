@@ -2,8 +2,8 @@ import jax
 import jax.numpy as jnp
 import flax.linen as nn
 
-from convolutional import ConvND, AvgND
-from basic import Identity
+from .convolutional import ConvND, AvgND
+from .basic import Identity
 
 class Scale2X(nn.Module):
     """

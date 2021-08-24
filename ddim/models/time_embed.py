@@ -2,6 +2,9 @@ import jax
 import jax.numpy as jnp
 import flax.linen as nn
 
+import math
+from typing import Sequence
+
 class TimeEmbed(nn.Module):
     """
     Timestep embedding module

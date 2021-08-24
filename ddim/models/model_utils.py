@@ -27,7 +27,7 @@ def load_params(path, devices, precision_policy = None):
     with open(path, "rb") as f:
         params_load = pickle.load(f)
     
-    if precision_policy != None:
+    if not precision_policy is None:
         # Convert to desired precision
         params_load = precision_policy.cast_to_compute(params_load)
         

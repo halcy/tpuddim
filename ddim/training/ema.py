@@ -20,8 +20,7 @@ class EMA():
         
         params_new = []
         for i in range(len(params)):
-            params[i] = (1. - self.mu) * params[i] + self.mu * params_prev[i]
+            params[i] = (1. - self.mu) * params_prev[i] + self.mu * jax.lax.stop_gradient(params[i])
             
         params = jax.tree_util.tree_unflatten(treedef, params)
         return params
-    

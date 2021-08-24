@@ -6,7 +6,7 @@ def linear_beta_schedule(steps):
     Get a linear spaced beta schedule
     """
     scale = 1000 / steps
-      = scale * 0.0001
+    beta_start = scale * 0.0001
     beta_end = scale * 0.02
     return jnp.linspace(beta_start, beta_end, steps)
 

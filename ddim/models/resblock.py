@@ -2,9 +2,10 @@ import jax
 import jax.numpy as jnp
 import flax.linen as nn
 
-from time_embed import TimestepBlock, TimestepEmbedSequential
-from resampling import Upsample, Downsample
-from basic import Identity
+from .time_embed import TimestepBlock, TimestepEmbedSequential
+from .resampling import Upsample, Downsample
+from .convolutional import ConvND
+from .basic import Identity
 
 class ResBlock(TimestepBlock):
     """

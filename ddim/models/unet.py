@@ -2,10 +2,12 @@ import jax
 import jax.numpy as jnp
 import flax.linen as nn
 
-from time_embed import TimeEmbed, TimestepEmbedSequential
-from convolutional import ConvND
-from resblock import ResBlock
-from attention import SpatialSelfAttentionBlock
+from .time_embed import TimeEmbed, TimestepEmbedSequential
+from .convolutional import ConvND
+from .resblock import ResBlock
+from .attention import SpatialSelfAttentionBlock
+
+from typing import Sequence
 
 class UNet(nn.Module):
     """

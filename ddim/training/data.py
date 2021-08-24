@@ -13,7 +13,7 @@ class TimestepSampler():
         prng, key = jax.random.split(prng)
         
         weights = jnp.ones([self.timesteps])
-        probs = weights / np.sum(weights)
+        probs = weights / jnp.sum(weights)
         indices_sample = jax.random.choice(key, len(weights), (self.batch_size,), p = probs)
         weights_sample = 1.0 / (len(probs) * probs[indices_sample])
         
