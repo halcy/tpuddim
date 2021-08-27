@@ -22,8 +22,8 @@ def train_step_update(opt, model, diff_params, params, opt_params, batch, timest
     loss, grad = jax.value_and_grad(loss_curried)(params_compute, diff_params, batch, timesteps, noise)
     
     if not precision_policy is None:
-        loss = precision_policy.cast_to_params(loss)
-        grad = precision_policy.cast_to_params(grad)
+        loss = precision_policy.cast_to_param(loss)
+        grad = precision_policy.cast_to_param(grad)
     
     updates, opt_params = opt.update(grad, opt_params, params)
     params = optax.apply_updates(params, updates)
@@ -106,7 +106,7 @@ def get_train_loop(opt, model, diff_params, data_sampler, timestep_sampler, ema,
     """
     Get a function that trains for multiple steps (default: 1000) without going back to the host
     """
-    update_func = get_pjit_train_step_update(opt, model, diff_params, pjit_update, donate, precision_policy = None)
+    update_func = get_pjit_train_step_update(opt, model, diff_params, pjit_update, donate, precision_policy = precision_policy)
     
     def train_iterations(prng, params, opt_params, batches):
         def one_step(idx, args):
@@ -147,6 +147,8 @@ def get_train_loop(opt, model, diff_params, data_sampler, timestep_sampler, ema,
             prng, batch = data_sampler.sample(prng)
             samples.append(batch)
         samples = jnp.array(samples)
+        if not precision_policy is None:
+            samples = precision_policy.cast_to_compute(samples)
         return train_loop(prng, params, opt_params, samples)
     
     return get_data_and_train
