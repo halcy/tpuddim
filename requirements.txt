@@ -7,3 +7,4 @@ flax
 jax[tpu]>=0.2.16
 
 git+https://github.com/deepmind/jmp
+tensorboardX

@@ -2,6 +2,7 @@ import optax
 import jax
 import jax.numpy as jnp
 from jax.experimental.pjit import pjit, PartitionSpec
+from jax.ops import index_update
 
 from ..diffusion.loss import loss_fn_mean
 
@@ -107,13 +108,14 @@ def get_train_loop(opt, model, diff_params, data_sampler, timestep_sampler, ema,
             noise = jax.random.normal(subkey, batch.shape)
             
             # Run update
-            loss, params_new, opt_params_new = update_func(params, opt_params, batch, timesteps, noise)
+            loss_v, params_new, opt_params_new = update_func(params, opt_params, batch, timesteps, noise)
+            loss = index_update(loss, idx, loss_v)
             if not ema is None:
                 params_new = ema.apply(params_new, params)
                 
             return (prng, params_new, opt_params_new, batches, loss)
 
-        loss = 0.0
+        loss = jnp.zeros((how_many,))
         args_0 = (prng, params, opt_params, batches, loss)
         prng, params, opt_params, _, loss = jax.lax.fori_loop(0, how_many, one_step, args_0)
         return (prng, params, opt_params, loss)

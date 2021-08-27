@@ -24,6 +24,7 @@ class UNet(nn.Module):
     attention_resolutions: Sequence[int]
     out_channels: int
     dtype: jnp.dtype = jnp.bfloat16
+    dtype_out: jnp.dtype = jnp.float32
     
     def setup(self):
         # Timestep embedding
@@ -133,7 +134,7 @@ class UNet(nn.Module):
             h = block(h, emb)
 
         h = self.out(h)
-        return h
+        return h.astype(self.dtype_out)
 
 if __name__ == "__main__":
     from model_utils import get_default_channel_mult
