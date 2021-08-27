@@ -6,18 +6,30 @@ from jax.ops import index_update
 
 from ..diffusion.loss import loss_fn_mean
 
-def train_step_update(opt, model, diff_params, params, opt_params, batch, timesteps, noise):
+def train_step_update(opt, model, diff_params, params, opt_params, batch, timesteps, noise, precision_policy = None):
     """
     Take one parameter update step
     """
     def loss_curried(params, diff_params, batch, timesteps, noise):
         return loss_fn_mean(model, params, diff_params, batch, timesteps, noise)
-    loss, grad = jax.value_and_grad(loss_curried)(params, diff_params, batch, timesteps, noise)
+    
+    if not precision_policy is None:
+        params_compute = precision_policy.cast_to_compute(params)
+        batch = precision_policy.cast_to_compute(batch)
+    else:
+        params_compute = params
+        
+    loss, grad = jax.value_and_grad(loss_curried)(params_compute, diff_params, batch, timesteps, noise)
+    
+    if not precision_policy is None:
+        loss = precision_policy.cast_to_params(loss)
+        grad = precision_policy.cast_to_params(grad)
+    
     updates, opt_params = opt.update(grad, opt_params, params)
     params = optax.apply_updates(params, updates)
     return loss, params, opt_params
 
-def get_pjit_train_step_update(opt, model, diff_params, use_pjit = True, donate = True):
+def get_pjit_train_step_update(opt, model, diff_params, use_pjit = True, donate = True, precision_policy = None):
     """
     Return a version of train_step_update with opt, model and diff_params curried out and pjit applied
     """
@@ -30,7 +42,8 @@ def get_pjit_train_step_update(opt, model, diff_params, use_pjit = True, donate 
             opt_params,
             batch,
             timesteps,
-            noise
+            noise,
+            precision_policy
         )
     
     if use_pjit:
@@ -89,11 +102,11 @@ def get_pjit_train_step(update_func, data_sampler, timestep_sampler, ema = None,
     else:
         return step_func
     
-def get_train_loop(opt, model, diff_params, data_sampler, timestep_sampler, ema, how_many = 1000, pjit_loop = True, pjit_update = True, donate = True):
+def get_train_loop(opt, model, diff_params, data_sampler, timestep_sampler, ema, how_many = 1000, pjit_loop = True, pjit_update = True, donate = True, precision_policy = None):
     """
     Get a function that trains for multiple steps (default: 1000) without going back to the host
     """
-    update_func = get_pjit_train_step_update(opt, model, diff_params, pjit_update, donate)
+    update_func = get_pjit_train_step_update(opt, model, diff_params, pjit_update, donate, precision_policy = None)
     
     def train_iterations(prng, params, opt_params, batches):
         def one_step(idx, args):
