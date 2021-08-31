@@ -14,15 +14,17 @@ class UNet(nn.Module):
     Unet style model with spatial self attention.
     Unconditional only, for now.
     """
-    dims: int
     model_channels: int
     channel_mult: int
     use_scale_shift_norm: bool
-    dropout: float
     num_head_channels: int
     num_res_blocks: int
     attention_resolutions: Sequence[int]
     out_channels: int
+    
+    dims: int = 2
+    dropout: float = 0.0
+    
     dtype: jnp.dtype = jnp.bfloat16
     dtype_out: jnp.dtype = jnp.float32
     

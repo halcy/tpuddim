@@ -57,16 +57,16 @@ def denoising_loop(model, params, diff_params, images_in_0, dtype = jnp.float32,
     images_in_0 = jax.lax.stop_gradient(images_in_0)
     return jax.lax.fori_loop(0, num_steps, one_step, images_in_0)
 
-def denoising_loop_respaced(params, image_in_0):
+def denoising_loop_respaced(model, params, diff_params, images_in_0, dtype = jnp.float32, first_step = 0, num_steps = 1000, num_steps_respaced = 25):
     """
     Full on device ddim sample loop, respaced version
     """
-    def one_step(i, image_in_step, respacing_factor, num_steps = 1000):
+    respacing_factor = num_steps // num_steps_respaced
+    def one_step(i, images_in_step):
         embed_in = jnp.array([num_steps - 1 - i * respacing_factor])
-        return ddim_sample(model, params, image_in_step, embed_in, rescale_fact = respacing_factor)
-    image_in_0 = jax.lax.stop_gradient(image_in_0)
-    num_steps_respaced = int(num_steps // respacing_factor)
-    return jax.lax.fori_loop(0, num_steps_respaced, one_step, image_in_0)
+        return ddim_sample(model, params, diff_params, images_in_step, embed_in, dtype_out = dtype, rescale_fact = respacing_factor)
+    images_in_0 = jax.lax.stop_gradient(images_in_0)
+    return jax.lax.fori_loop(first_step, num_steps_respaced, one_step, images_in_0)
 
 def sample_to_img(sample):
     """

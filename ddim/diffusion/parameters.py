@@ -40,7 +40,7 @@ def respace_betas(betas, steps = 25):
     """
     Respace a beta schedule to a given amount of steps
     """
-    use_timesteps = list(np.arange(len(betas) - 1, 0, -(len(betas) // steps)))
+    use_timesteps = list(jnp.arange(len(betas) - 1, 0, -(len(betas) // steps)))
     alphas = 1.0 - betas
     alphas_cumprod = jnp.cumprod(alphas, axis=0)
     
