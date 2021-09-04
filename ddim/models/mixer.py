@@ -139,12 +139,14 @@ class UpdownMixerBlockWithTime(nn.Module):
         b, h, w, c = x.shape
         
         # Add position channels
-        x = PositionEncoder(name="pos embed")(x)
+        #x = PositionEncoder(name="pos embed")(x)
+        #print("in", x.shape)
         
         # To patches
         x = nn.Conv(self.hidden_dim, self.patches, strides=self.patches, name='patch')(x)
         _, patch_h, patch_w, _ = x.shape
         x = einops.rearrange(x, 'n h w c -> n (h w) c')
+        #print("before", x.shape)
         
         # Add time embedding
         x = x + t
@@ -159,8 +161,12 @@ class UpdownMixerBlockWithTime(nn.Module):
         y = nn.LayerNorm()(x) 
         x = x + MlpBlock(self.channels_mlp_dim, name='channel_mixing')(y)
         
+        #print("after", x.shape)
+        
         # Back up to original shape
         x = x.reshape(b, patch_h, patch_w, -1)
+        #print("conv", x.shape)
+        
         x = nn.ConvTranspose(c, self.patches, strides=self.patches, name='unpatch')(x)
         
         return x    
@@ -199,8 +205,10 @@ class UpdownMlpMixer(nn.Module):
             if i <= self.timestep_inject_to and i % self.timestep_inject_every == 0:
                 t = time_embed
             else:
-                t = jnp.zeros(time_embed.shape)                
+                t = jnp.zeros(time_embed.shape)
+            #print("pre", x.shape)
             x = UpdownMixerBlockWithTime(hidden_dim, self.patches, self.tokens_mlp_dim, self.channels_mlp_dim, name=f"block{i}")(x, t)
+            #print("post", x.shape)
         x = nn.LayerNorm(name='pre_head_layer_norm')(x)
             
         # Convolutional output block - just get down to channel count
