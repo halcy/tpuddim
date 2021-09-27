@@ -49,10 +49,12 @@ class ResBlock(TimestepBlock):
 
         # Actual layer stack
         self.out_norm = nn.GroupNorm(epsilon=1e-05, dtype=self.dtype)
+        self.out_drop = nn.Dropout(self.dropout)
+        self._needs_train = True
+        
         self.out_layers = TimestepEmbedSequential((
             nn.silu,
-            nn.Dropout(self.dropout, deterministic=True), # TODO: This should be dynamic, for training. Right now it's a noop.
-            ConvND(self.dims, self.out_channels, 3, dtype=self.dtype) # There was a zero initializer (?) here, it's gone now, sorry. Maybe not important.
+            ConvND(self.dims, self.out_channels, 3, dtype=self.dtype)
         ))
 
         # Channel change for skip connection
@@ -63,7 +65,7 @@ class ResBlock(TimestepBlock):
         else:
             self.skip_connection = ConvND(self.dims, self.out_channels, 1, dtype=self.dtype)
 
-    def __call__(self, x, emb):
+    def __call__(self, x, emb, train=False):
         # For residual: Resample x
         x_res = self.x_upd(x)
 
@@ -81,10 +83,12 @@ class ResBlock(TimestepBlock):
             scale = emb_out[..., :self.out_channels]
             shift = emb_out[..., self.out_channels:]
             x = self.out_norm(x) * (1 + scale) + shift
+            x = self.out_drop(x, deterministic = not train)
             x = self.out_layers(x)
         else:
             x = x + emb_out
             x = self.out_norm(x)
+            x = self.out_drop(x, deterministic = not train)
             x = self.out_layers(x)
 
         # Return residual

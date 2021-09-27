@@ -48,14 +48,26 @@ class TimestepEmbedSequential(TimestepBlock):
     Also works as a regular sequential type module
     """
     layers: Sequence[nn.Module]
-
+    needs_train: Sequence[bool] = None
+    
     @nn.compact
-    def __call__(self, x, emb = None):
-        for layer in self.layers:
+    def __call__(self, x, emb = None, train = None):
+        if self.needs_train is None:
+            _needs_train = [False] * len(self.layers)
+        else:
+            _needs_train = self.needs_train
+            
+        for layer, _block_needs_train in zip(self.layers, _needs_train):
             if isinstance(layer, TimestepBlock):
-                x = layer(x, emb)
+                if _block_needs_train:
+                    x = layer(x, emb, train = train)
+                else:
+                    x = layer(x, emb)
             else:
-                x = layer(x)
+                if _block_needs_train:
+                    x = layer(x, train)
+                else:
+                    x = layer(x)
         return x
 
 class TimestepIdentity(TimestepBlock):

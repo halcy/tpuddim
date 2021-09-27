@@ -21,7 +21,6 @@ class UNet(nn.Module):
     num_res_blocks: int
     attention_resolutions: Sequence[int]
     out_channels: int
-    
     dims: int = 2
     dropout: float = 0.0
     
@@ -45,21 +44,23 @@ class UNet(nn.Module):
             for _ in range(self.num_res_blocks):
                 # One res block
                 layers = [ResBlock(self.dims, current_channels, int(mult * self.model_channels), dropout = self.dropout, use_scale_shift_norm = self.use_scale_shift_norm, dtype=self.dtype)]
+                needs_train = [True]
                 current_channels = int(mult * self.model_channels)
 
                 # One attention block, if requested
                 if downsample_fact in self.attention_resolutions:
                     layers.append(SpatialSelfAttentionBlock(self.num_head_channels, dtype=self.dtype))
-
+                    needs_train.append(False)
                 # Put those in sequence
-                input_blocks.append(TimestepEmbedSequential(layers))
+                input_blocks.append(TimestepEmbedSequential(layers, needs_train))
                 input_block_chans.append(current_channels)
 
             # Downsample if not the final block
             if level != len(self.channel_mult) - 1:
                 input_blocks.append(ResBlock(self.dims, current_channels, current_channels, dropout = self.dropout, use_scale_shift_norm = self.use_scale_shift_norm, down = True, dtype=self.dtype))
                 input_block_chans.append(current_channels)
-                downsample_fact *= 2             
+                downsample_fact *= 2
+                
         self.input_blocks = input_blocks
 
         # Middle block
@@ -67,7 +68,7 @@ class UNet(nn.Module):
             ResBlock(self.dims, current_channels, current_channels, self.dropout, use_scale_shift_norm = self.use_scale_shift_norm, dtype=self.dtype),
             SpatialSelfAttentionBlock(self.num_head_channels, dtype=self.dtype),
             ResBlock(self.dims, current_channels, current_channels, self.dropout, use_scale_shift_norm = self.use_scale_shift_norm, dtype=self.dtype),
-        ])
+        ], [True, False, True])
 
         # Output blocks
         output_blocks = []
@@ -77,18 +78,21 @@ class UNet(nn.Module):
                 skip_channels = input_block_chans.pop()
                 in_channels = current_channels + skip_channels
                 layers = [ResBlock(self.dims, in_channels, int(self.model_channels * mult), dropout = self.dropout, use_scale_shift_norm = self.use_scale_shift_norm, dtype=self.dtype)]
+                needs_train = [True]
                 current_channels = int(self.model_channels * mult)
 
                 # One attention block, if requested
                 if downsample_fact in self.attention_resolutions:
                     layers.append(SpatialSelfAttentionBlock(self.num_head_channels, dtype=self.dtype))
+                    needs_train.append(False)
                     
                 # Upsample, if not the final block
                 if level != 0 and i == self.num_res_blocks:
                     out_ch = current_channels
                     layers.append(ResBlock(self.dims, current_channels, current_channels, dropout = self.dropout, use_scale_shift_norm = self.use_scale_shift_norm, up = True, dtype=self.dtype))
+                    needs_train.append(True)
                     downsample_fact //= 2
-                output_blocks.append(TimestepEmbedSequential(layers))
+                output_blocks.append(TimestepEmbedSequential(layers, needs_train))
         self.output_blocks = output_blocks
 
         # Final output block
@@ -120,20 +124,20 @@ class UNet(nn.Module):
         return h
 
     # Full forward pass
-    def __call__(self, x, t):
+    def __call__(self, x, t, train = False):
         emb = self.time_embed(t)
 
         h = x
         hs = []
         for block in self.input_blocks:
-            h = block(h, emb)
+            h = block(h, emb, train)
             hs.append(h)
 
         h = self.middle_block(h, emb)
 
         for block in self.output_blocks:
             h = jnp.concatenate([h, hs.pop()], axis = -1)
-            h = block(h, emb)
+            h = block(h, emb, train)
 
         h = self.out(h)
         return h.astype(self.dtype_out)

@@ -6,12 +6,12 @@ from jax.ops import index_update
 
 from ..diffusion.loss import loss_fn_mean
 
-def train_step_update(opt, model, diff_params, params, opt_params, batch, timesteps, noise, precision_policy = None):
+def train_step_update(opt, model, diff_params, params, opt_params, batch, timesteps, noise, prng, precision_policy = None):
     """
     Take one parameter update step
     """
-    def loss_curried(params, diff_params, batch, timesteps, noise):
-        return loss_fn_mean(model, params, diff_params, batch, timesteps, noise)
+    def loss_curried(params, diff_params, batch, timesteps, noise, prng):
+        return loss_fn_mean(model, params, diff_params, batch, timesteps, noise, prng)
     
     if not precision_policy is None:
         params_compute = precision_policy.cast_to_compute(params)
@@ -19,7 +19,7 @@ def train_step_update(opt, model, diff_params, params, opt_params, batch, timest
     else:
         params_compute = params
         
-    loss, grad = jax.value_and_grad(loss_curried)(params_compute, diff_params, batch, timesteps, noise)
+    loss, grad = jax.value_and_grad(loss_curried)(params_compute, diff_params, batch, timesteps, noise, prng)
     
     if not precision_policy is None:
         loss = precision_policy.cast_to_param(loss)
@@ -33,7 +33,7 @@ def get_pjit_train_step_update(opt, model, diff_params, use_pjit = True, donate 
     """
     Return a version of train_step_update with opt, model and diff_params curried out and pjit applied
     """
-    def step_func(params, opt_params, batch, timesteps, noise):
+    def step_func(params, opt_params, batch, timesteps, noise, prng):
         return train_step_update(
             opt, 
             model, 
@@ -43,65 +43,24 @@ def get_pjit_train_step_update(opt, model, diff_params, use_pjit = True, donate 
             batch,
             timesteps,
             noise,
+            prng,
             precision_policy
         )
     
     if use_pjit:
         donate_argnums = tuple()
         if donate:
-            donate_argnums = (1, 2, 3, 4)
+            donate_argnums = (1, 2, 3, 4, 5)
             
         step_func = pjit(
             step_func, 
-            [None, None, PartitionSpec("batch", "x", "y"), PartitionSpec("batch"), PartitionSpec("batch", "x", "y")], 
+            [None, None, PartitionSpec("batch", "x", "y"), PartitionSpec("batch"), PartitionSpec("batch", "x", "y"), None], 
             [None, None, None],
             donate_argnums = donate_argnums
         )
     
     return step_func
 
-def train_step(update_func, data_sampler, timestep_sampler, ema, prng, params, opt_params):
-    """
-    Take one full training step:
-    * Sample timesteps
-    * Sample data batch
-    * Calculate loss and update paramaters
-    * Perform EMA update, if desired
-    """
-    prng, batch = data_sampler.sample(prng)
-    prng, timesteps, weights = timestep_sampler.sample(prng)
-    
-    prng, subkey = jax.random.split(prng)
-    noise = jax.random.normal(subkey, batch.shape)
-    
-    loss, params_new, opt_params_new = update_func(params, opt_params, batch, timesteps, noise)
-        
-    if not ema is None:
-        params_new = ema.apply(params_new, params)
-    return prng, params_new, opt_params_new, loss
-
-def get_pjit_train_step(update_func, data_sampler, timestep_sampler, ema = None, use_pjit = True, donate = True):
-    """
-    Version of train_step with constant arguments curried out and pjit applied
-    """
-    def step_func(prng, params, opt_params):
-        return train_step(
-            update_func,
-            data_sampler,
-            timestep_sampler,
-            ema,
-            prng, 
-            params, 
-            opt_params
-        )
-    if use_pjit:
-        donate_argnums = tuple()
-        if donate:
-            donate_argnums = (0, 1, 2)
-        return pjit(step_func, None, None, donate_argnums = donate_argnums)
-    else:
-        return step_func
-    
 def get_train_loop(opt, model, diff_params, data_sampler, timestep_sampler, ema, how_many = 1000, pjit_loop = True, pjit_update = True, donate = True, precision_policy = None):
     """
     Get a function that trains for multiple steps (default: 1000) without going back to the host
@@ -121,7 +80,8 @@ def get_train_loop(opt, model, diff_params, data_sampler, timestep_sampler, ema,
             noise = jax.random.normal(subkey, batch.shape)
             
             # Run update
-            loss_v, params_new, opt_params_new = update_func(params, opt_params, batch, timesteps, noise)
+            prng, subkey = jax.random.split(prng)
+            loss_v, params_new, opt_params_new = update_func(params, opt_params, batch, timesteps, noise, subkey)
             loss = index_update(loss, idx, loss_v)
             if not ema is None:
                 params_new = ema.apply(params_new, params)
