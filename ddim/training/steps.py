@@ -85,12 +85,13 @@ def get_train_loop(opt, model, diff_params, data_sampler, timestep_sampler, ema,
             loss = index_update(loss, idx, loss_v)
             if not ema is None:
                 params_ema = ema.apply(params_new, params_ema)
-                
+            else:
+                params_ema
             return (prng, params_new, params_ema, opt_params_new, batches, loss)
 
         loss = jnp.zeros((how_many,))
         args_0 = (prng, params, params_ema, opt_params, batches, loss)
-        prng, params, opt_params, _, loss = jax.lax.fori_loop(0, how_many, one_step, args_0)
+        prng, params, params_ema, opt_params, _, loss = jax.lax.fori_loop(0, how_many, one_step, args_0)
         return (prng, params, params_ema, opt_params, loss)
             
     if pjit_loop:
@@ -101,7 +102,7 @@ def get_train_loop(opt, model, diff_params, data_sampler, timestep_sampler, ema,
     else:
         train_loop = train_iterations
         
-    def get_data_and_train(prng, params_ema, params, opt_params):
+    def get_data_and_train(prng, params, params_ema, opt_params):
         samples = []
         for i in range(how_many):
             prng, batch = data_sampler.sample(prng)
