@@ -67,9 +67,9 @@ def get_train_loop(opt, model, diff_params, data_sampler, timestep_sampler, ema,
     """
     update_func = get_pjit_train_step_update(opt, model, diff_params, pjit_update, donate, precision_policy = precision_policy)
     
-    def train_iterations(prng, params, opt_params, batches):
+    def train_iterations(prng, params, params_ema, opt_params, batches):
         def one_step(idx, args):
-            (prng, params, opt_params, batches, loss) = args
+            (prng, params, params_ema, opt_params, batches, loss) = args
             
             # Get data sample
             batch = batches[idx]
@@ -84,24 +84,24 @@ def get_train_loop(opt, model, diff_params, data_sampler, timestep_sampler, ema,
             loss_v, params_new, opt_params_new = update_func(params, opt_params, batch, timesteps, noise, subkey)
             loss = index_update(loss, idx, loss_v)
             if not ema is None:
-                params_new = ema.apply(params_new, params)
+                params_ema = ema.apply(params_new, params_ema)
                 
-            return (prng, params_new, opt_params_new, batches, loss)
+            return (prng, params_new, params_ema, opt_params_new, batches, loss)
 
         loss = jnp.zeros((how_many,))
-        args_0 = (prng, params, opt_params, batches, loss)
+        args_0 = (prng, params, params_ema, opt_params, batches, loss)
         prng, params, opt_params, _, loss = jax.lax.fori_loop(0, how_many, one_step, args_0)
-        return (prng, params, opt_params, loss)
+        return (prng, params, params_ema, opt_params, loss)
             
     if pjit_loop:
         donate_argnums = tuple()
         if donate:
-            donate_argnums = (0, 1, 2, 3)
+            donate_argnums = (0, 1, 2, 3, 4)
         train_loop = pjit(train_iterations, None, None, donate_argnums = donate_argnums)
     else:
         train_loop = train_iterations
         
-    def get_data_and_train(prng, params, opt_params):
+    def get_data_and_train(prng, params_ema, params, opt_params):
         samples = []
         for i in range(how_many):
             prng, batch = data_sampler.sample(prng)
@@ -109,7 +109,7 @@ def get_train_loop(opt, model, diff_params, data_sampler, timestep_sampler, ema,
         samples = jnp.array(samples)
         if not precision_policy is None:
             samples = precision_policy.cast_to_compute(samples)
-        return train_loop(prng, params, opt_params, samples)
+        return train_loop(prng, params, params_ema, opt_params, samples)
     
     return get_data_and_train
     
