@@ -6,6 +6,8 @@ Still quite WIP, though less so now, there is code for inference and basic train
 
 There's also an attempt at making a mixer work as a diffusion model, that doesn't quite work yet. Patches extremely welcome, especially if they adress one of the things marked TODO in the code somewhere.
 
+(Note that training on Colab will _not_ work - this code was developed on, and the models trained on, TRC TPUs)
+
 MNIST example output:
 
 ![generated mnist digits](https://github.com/halcy/tpuddim/blob/main/mnist_example.png?raw=true)
