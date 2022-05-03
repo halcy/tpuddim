@@ -1,4 +1,4 @@
-# tpuddim
+# Tpuddim
 
 Denoising Diffusion Implicit Models JAX TPU implementation. Based on the network architecture in https://github.com/openai/guided-diffusion , pretrained weights compatible.
 
@@ -15,3 +15,7 @@ MNIST example output:
 Danbooru2019Faces example output:
 
 ![generated mnist digits](https://github.com/halcy/tpuddim/blob/main/danbooru_sample.png?raw=true)
+
+# Acknowledgements
+
+This work would not have been possible without a TPU access grant by the Google [TPU Research Cloud](https://sites.research.google/trc/about/).
